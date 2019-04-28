@@ -1,0 +1,2 @@
+src/komoot-importer/*.egg-info
+src/komoot-importer/komoot-importer/__pycache__/

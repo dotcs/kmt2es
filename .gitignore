@@ -1,0 +1,8 @@
+# IDE
+.vscode
+
+# Python
+__pycache__
+*.egg-info
+
+docker-compose.yaml

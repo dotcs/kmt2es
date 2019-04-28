@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import bulk
 
-log = logging.getLogger('komoot-importer')
+log = logging.getLogger('kmt2es')
 
 ES_INDEX_TOUR = 'komoot-tour-{year:02d}-{month:02d}'
 ES_INDEX_COORDINATES = 'komoot-coordinates-{year:02d}-{month:02d}'

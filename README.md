@@ -31,8 +31,8 @@ This repository contains a Dockerfile that allows to build a docker container
 that comes with all necessary tools pre-installed:
 
 ```bash
-docker build -t komoot-importer:latest .
-docker run --rm -it komoot-importer \
+docker build -t kmt2es:latest .
+docker run --rm -it kmt2es \
     --user-id ${KOMOOT_USER_ID} \
     --cookie "${KOMOOT_COOKIE}" \
     --elasticsearch-host http://localhost:9200

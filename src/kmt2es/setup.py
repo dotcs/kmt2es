@@ -3,7 +3,7 @@ from setuptools import setup
 setup(name='kmt2es',
       version='1.0.0',
       description='Import tours that have been recorded by Komoot into an ElasticSearch database',
-      url='',
+      url='https://github.com/dotcs/kmt2es',
       author='Fabian Mueller',
       author_email='git@dotcs.me',
       license='CC BY-SA 4.0',

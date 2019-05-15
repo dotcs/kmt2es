@@ -121,7 +121,7 @@ def main(cli_args):
     es = Elasticsearch(**es_args)
     log.info(es.info())
 
-    log.info("Use elasticsearch index format for tours: " + cli_args.es_index_format_tours)
+    log.info("Use elasticsearch index format for tours: " + cli_args.es_index_format_tour)
     log.info("Use elasticsearch index format for coordinates: " + cli_args.es_index_format_coordinates)
 
     # Update cookie header that will be used to verify

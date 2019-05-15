@@ -134,7 +134,7 @@ if __name__ == "__main__":
     es_index_tour_default = 'komoot-tour-{year:02d}-{month:02d}'
     es_index_coordinates_default = 'komoot-coordinates-{year:02d}-{month:02d}'
 
-    parser = argparse.ArgumentParser(description='Import komoot tours into elasticsearch database.')
+    parser = argparse.ArgumentParser(description='Import komoot tours into elasticsearch database.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-u", "--user-id", 
         dest="user_id", help="Komoot user id", required=True)
     parser.add_argument("--elasticsearch-host", 

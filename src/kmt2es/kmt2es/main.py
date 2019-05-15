@@ -10,9 +10,6 @@ from elasticsearch.helpers import bulk
 
 log = logging.getLogger('kmt2es')
 
-ES_INDEX_TOUR = 'komoot-tour-{year:02d}-{month:02d}'
-ES_INDEX_COORDINATES = 'komoot-coordinates-{year:02d}-{month:02d}'
-
 headers = {
     'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'cookie': ''  # value will be set in main method
@@ -47,7 +44,7 @@ def _request_coordinates(tour_id):
         raise RuntimeError("Request failed with status code {}.".format(r.status_code))
     return json.loads(r.text)
 
-def _transform_coordinates(coordinates, start_date, tour_id, tour_sport):
+def _transform_coordinates(coordinates, start_date, tour_id, tour_sport, index, cli_args):
     """
     Calculate the timestamp by adding deltas to the initial timestamp of the
     tour. Then transform coordinates entries in a native format that
@@ -64,7 +61,7 @@ def _transform_coordinates(coordinates, start_date, tour_id, tour_sport):
         time_delta_in_s = 0.0 if prev_row is None else (row['t'] - prev_row['t']) / 1000
         speed = 0.0 if prev_row is None or time_delta_in_s == 0.0 else distance / time_delta_in_s
         rows.append({ 
-            '_index': ES_INDEX_COORDINATES.format(year=dt_start.year, month=dt_start.month), 
+            '_index': cli_args.es_index_format_coordinates.format(year=dt_start.year, month=dt_start.month), 
             '_type': 'coordinate',
             '_id': '{}_{}'.format(tour_id, i), 
             'tour_id': tour_id, 
@@ -80,7 +77,7 @@ def _transform_coordinates(coordinates, start_date, tour_id, tour_sport):
         prev_row = row
     return rows
 
-def _send_to_elasticsearch(es, tours):
+def _send_to_elasticsearch(es, tours, cli_args):
     for i, row in enumerate(tours):
         # Limit results to recorded tours only
         if row['type'] != 'tour_recorded':
@@ -89,16 +86,16 @@ def _send_to_elasticsearch(es, tours):
         tour_id = row['id']
 
         dt = iso8601.parse_date(row['date'])
-        _create_elasticsearch_index(es, dt)
+        _create_elasticsearch_index(es, dt, cli_args)
 
-        res = es.index(index=ES_INDEX_TOUR.format(year=dt.year, month=dt.month), doc_type='tour', id=tour_id, body=row)
+        res = es.index(index=cli_args.es_index_format_tour.format(year=dt.year, month=dt.month, day=dt.day), doc_type='tour', id=tour_id, body=row)
         coordinates = _request_coordinates(tour_id)
-        coordinates = _transform_coordinates(coordinates, row['date'], tour_id, row['sport'])
+        coordinates = _transform_coordinates(coordinates, row['date'], tour_id, row['sport'], cli_args)
         res = bulk(es, coordinates, chunk_size=1000, request_timeout=200)
         log.info("Imported tour id {}".format(tour_id))
 
-def _create_elasticsearch_index(es, dt):
-    es.indices.create(index=ES_INDEX_TOUR.format(year=dt.year, month=dt.month), ignore=400)
+def _create_elasticsearch_index(es, dt, cli_args):
+    es.indices.create(index=cli_args.es_index_format_tour.format(year=dt.year, month=dt.month, day=dt.day), ignore=400)
     mappings = '''
     {
         "mappings": {
@@ -111,37 +108,67 @@ def _create_elasticsearch_index(es, dt):
             }
         }
     }'''
-    es.indices.create(index=ES_INDEX_COORDINATES.format(year=dt.year, month=dt.month), ignore=400, body=mappings)
+    es.indices.create(index=cli_args.es_index_format_coordinates.format(year=dt.year, month=dt.month, day=dt.day), ignore=400, body=mappings)
 
-def main(args):
-    logging.basicConfig(level=args.log_level.upper())
+def main(cli_args):
+    logging.basicConfig(level=cli_args.log_level.upper())
 
     es_args = {
-        'hosts': [args.elasticsearch_host]
+        'hosts': [cli_args.es_host]
     }
-    if args.elasticsearch_http_auth:
-        es_args['http_auth'] = args.elasticsearch_http_auth
+    if cli_args.es_http_auth:
+        es_args['http_auth'] = cli_args.es_http_auth
     es = Elasticsearch(**es_args)
     log.info(es.info())
 
-    log.info("Use elasticsearch index format for tours: " + ES_INDEX_TOUR)
-    log.info("Use elasticsearch index format for coordinates: " + ES_INDEX_COORDINATES)
+    log.info("Use elasticsearch index format for tours: " + cli_args.es_index_format_tours)
+    log.info("Use elasticsearch index format for coordinates: " + cli_args.es_index_format_coordinates)
 
     # Update cookie header that will be used to verify
-    headers['cookie'] = args.cookie
+    headers['cookie'] = cli_args.cookie
 
-    tours_data = _request_tours(user_id=args.user_id, full_index=args.full_index)
+    tours_data = _request_tours(user_id=cli_args.user_id, full_index=cli_args.full_index)
     log.info("Index latest {} tours".format(len(tours_data)))
-    _send_to_elasticsearch(es, tours_data)
+    _send_to_elasticsearch(es, tours_data, cli_args)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Import komoot tours into elasticsearch database.')
-    parser.add_argument("-u", "--user-id", dest="user_id", help="Komoot user id", required=True)
-    parser.add_argument("--elasticsearch-host", dest="elasticsearch_host", help="Hostname of the ElasticSearch instance", required=True)
-    parser.add_argument("--elasticsearch-http-auth", dest="elasticsearch_http_auth", help="HTTP Authentication for ElasticSearch instance", default=None)
-    parser.add_argument("--full-index", dest="full_index", help="Indexes all recorded tours for the given user. Might use significantly more time, depending on the number of recoded tours. Otherwise only the latest 10 tours are indexed.", action="store_true")
-    parser.add_argument("-c", "--cookie", dest="cookie", help="Cookie value of a valid session (used for authentication).", required=True)
-    parser.add_argument("-l", "--log", dest="log_level", choices=['debug', 'info', 'warning', 'error', 'critical'], help="Set the logging level", default='error')
-    args = parser.parse_args()
+    es_index_tour_default = 'komoot-tour-{year:02d}-{month:02d}'
+    es_index_coordinates_default = 'komoot-coordinates-{year:02d}-{month:02d}'
 
-    main(args)
+    parser = argparse.ArgumentParser(description='Import komoot tours into elasticsearch database.')
+    parser.add_argument("-u", "--user-id", 
+        dest="user_id", help="Komoot user id", required=True)
+    parser.add_argument("--elasticsearch-host", 
+        dest="es_host", help="Hostname of the ElasticSearch instance, e.g. \"http://localhost:9200\"", required=True)
+    parser.add_argument("--elasticsearch-http-auth", 
+        dest="es_http_auth", help="HTTP authentication for ElasticSearch instance. This should be left empty if no authentication is set up.", default=None)
+    parser.add_argument("--full-index", 
+        dest="full_index", 
+        help="Indexes all recorded tours for the given user. Might use significantly more time, depending on the number of recoded tours. Otherwise only the latest 10 tours are indexed.", 
+        action="store_true"
+    )
+    parser.add_argument("-c", "--cookie", 
+        dest="cookie", 
+        help="Cookie value of a valid session (used for authentication).", 
+        required=True
+    )
+    parser.add_argument("-l", "--log", 
+        dest="log_level", 
+        choices=['debug', 'info', 'warning', 'error', 'critical'], 
+        help="Set the logging level", 
+        default='error'
+    )
+    parser.add_argument("--elasticsearch-index-format-tour", 
+        dest="es_index_format_tour", 
+        help="Set elasticsearch index format for komoot tours. Use year, month and day variables to set rollover index if needed.", 
+        default=es_index_tour_default
+    )
+    parser.add_argument("--elasticsearch-index-format-coordinates", 
+        dest="es_index_format_coordinates", 
+        help="Set elasticsearch index format for coordinates of komoot tours. Use year, month and day variables to set rollover index if needed.", 
+        default=es_index_coordinates_default
+    )
+
+    cli_args = parser.parse_args()
+
+    main(cli_args)

@@ -88,7 +88,7 @@ def _send_to_elasticsearch(es, tours, cli_args):
         dt = iso8601.parse_date(row['date'])
         _create_elasticsearch_index(es, dt, cli_args)
 
-        res = es.index(index=cli_args.es_index_format_tour.format(year=dt.year, month=dt.month, day=dt.day), doc_type='tour', id=tour_id, body=row)
+        res = es.index(index=cli_args.es_index_format_tour.format(year=dt.year, month=dt.month, day=dt.day), id=tour_id, body=row)
         coordinates = _request_coordinates(tour_id)
         coordinates = _transform_coordinates(coordinates, row['date'], tour_id, row['sport'], cli_args)
         res = bulk(es, coordinates, chunk_size=1000, request_timeout=200)

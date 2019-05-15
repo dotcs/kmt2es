@@ -44,7 +44,7 @@ def _request_coordinates(tour_id):
         raise RuntimeError("Request failed with status code {}.".format(r.status_code))
     return json.loads(r.text)
 
-def _transform_coordinates(coordinates, start_date, tour_id, tour_sport, index, cli_args):
+def _transform_coordinates(coordinates, start_date, tour_id, tour_sport, cli_args):
     """
     Calculate the timestamp by adding deltas to the initial timestamp of the
     tour. Then transform coordinates entries in a native format that

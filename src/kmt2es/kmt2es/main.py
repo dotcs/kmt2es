@@ -62,7 +62,6 @@ def _transform_coordinates(coordinates, start_date, tour_id, tour_sport, cli_arg
         speed = 0.0 if prev_row is None or time_delta_in_s == 0.0 else distance / time_delta_in_s
         rows.append({ 
             '_index': cli_args.es_index_format_coordinates.format(year=dt_start.year, month=dt_start.month), 
-            '_type': 'coordinate',
             '_id': '{}_{}'.format(tour_id, i), 
             'tour_id': tour_id, 
             'date': (dt_start + delta).isoformat(), 
